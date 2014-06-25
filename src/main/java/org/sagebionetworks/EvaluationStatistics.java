@@ -8,7 +8,6 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -23,7 +22,6 @@ import java.util.TreeMap;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.entity.ContentType;
 import org.joda.time.DateTime;
-import org.joda.time.DateTime.Property;
 import org.joda.time.DateTimeZone;
 import org.sagebionetworks.client.SynapseClient;
 import org.sagebionetworks.client.SynapseClientImpl;
@@ -50,7 +48,6 @@ import com.xeiam.xchart.Chart;
 import com.xeiam.xchart.ChartBuilder;
 import com.xeiam.xchart.StyleManager.ChartTheme;
 import com.xeiam.xchart.StyleManager.ChartType;
-import com.xeiam.xchart.SwingWrapper;
 
 /**
  *
@@ -106,21 +103,9 @@ public class EvaluationStatistics {
 		if (evals.size()!=evalPGs.getTotalNumberOfResults()) throw new IllegalStateException();
 		Map<String, List<String>> parentProjectNameToEvalIdMap = new TreeMap<String, List<String>>();
 		Map<String, WikiContent> evalIdToWikiContentMap = new HashMap<String,WikiContent>();
-		int evalCount = 0;
 		for (Evaluation eval : evals) {
 			String eid = eval.getId();
 			System.out.println(eid+" "+eval.getName());
-			Project parentProject = synapseClient.getEntity(eval.getContentSource(), Project.class);
-			String parentProjectName = parentProject.getName();
-			if (parentProjectName==null) parentProjectName = eval.getContentSource();
-			List<String> evalIds;
-			if (parentProjectNameToEvalIdMap.containsKey(parentProjectName)) {
-				evalIds = parentProjectNameToEvalIdMap.get(parentProjectName);
-			} else {
-				evalIds = new ArrayList<String>();
-				parentProjectNameToEvalIdMap.put(parentProjectName, evalIds);
-			}
-			evalIds.add(eid);
 			long total = Integer.MAX_VALUE;
 			Map<SubmissionStatusEnum,Integer> statusToCountMap = new HashMap<SubmissionStatusEnum,Integer>();
 			Map<String, TeamSubmissionStats> teams = new TreeMap<String, TeamSubmissionStats>();
@@ -163,6 +148,7 @@ public class EvaluationStatistics {
 					submissionsPerWeek.put(week, submissionsPerWeekCount+1);
 				}
 			}
+			if (total==0) continue; // if there are no entries, don't build a wiki
 			WikiContent wikiContent = new WikiContent();
 			int nSubmissions = total==Integer.MAX_VALUE ? 0 : (int)total;
 			Integer nScored = statusToCountMap.get(SubmissionStatusEnum.SCORED); if (nScored==null) nScored=0;
@@ -205,6 +191,18 @@ public class EvaluationStatistics {
 			String markdown = sb.toString();
 			wikiContent.setMarkdown(markdown);
 			evalIdToWikiContentMap.put(eid, wikiContent);
+			// record the evaluation as a child of its parent project
+			Project parentProject = synapseClient.getEntity(eval.getContentSource(), Project.class);
+			String parentProjectName = parentProject.getName();
+			if (parentProjectName==null) parentProjectName = eval.getContentSource();
+			List<String> evalIds;
+			if (parentProjectNameToEvalIdMap.containsKey(parentProjectName)) {
+				evalIds = parentProjectNameToEvalIdMap.get(parentProjectName);
+			} else {
+				evalIds = new ArrayList<String>();
+				parentProjectNameToEvalIdMap.put(parentProjectName, evalIds);
+			}
+			evalIds.add(eid);
 		}
 
 		// now we combine all the Evaluations under a project into one
@@ -233,6 +231,21 @@ public class EvaluationStatistics {
 			}
 		}
 		System.out.println("...wiki-page update complete.");
+		
+		// now clean up any unneeded wiki pages:
+		for (String pageTitle : pageMap.keySet()) {
+			V2WikiHeader header = pageMap.get(pageTitle);
+			if (!parentProjectNameToEvalIdMap.containsKey(pageTitle) && 
+					!header.getId().equals(rootPage.getId())) {
+				// then delete this wiki page
+				System.out.println("Deleting unneeded wiki page: "+pageTitle+" ("+header.getId()+")");
+				WikiPageKey pageKey = new WikiPageKey();
+				pageKey.setOwnerObjectId(wikiProjectId);
+				pageKey.setOwnerObjectType(ObjectType.ENTITY);
+				pageKey.setWikiPageId(header.getId());
+				synapseClient.deleteV2WikiPage(pageKey);
+			}
+		}
 	}
 
 	private static String imageMarkdownForFile(File file) throws UnsupportedEncodingException {
