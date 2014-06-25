@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.http.client.ClientProtocolException;
@@ -48,6 +50,7 @@ import com.xeiam.xchart.Chart;
 import com.xeiam.xchart.ChartBuilder;
 import com.xeiam.xchart.StyleManager.ChartTheme;
 import com.xeiam.xchart.StyleManager.ChartType;
+import com.xeiam.xchart.SwingWrapper;
 
 /**
  *
@@ -56,6 +59,7 @@ public class EvaluationStatistics {
 	public static void main( String[] args ) throws Exception {
 		EvaluationStatistics evaluatonStatistics = new EvaluationStatistics();
 		evaluatonStatistics.computeAndPublishEvaluationStats();
+		//evaluatonStatistics.showPlot(); TODO clean up
 		System.exit(0);
 	}
 
@@ -114,7 +118,7 @@ public class EvaluationStatistics {
 			Map<SubmissionStatusEnum,Integer> statusToCountMap = new HashMap<SubmissionStatusEnum,Integer>();
 			Map<String, TeamSubmissionStats> teams = new TreeMap<String, TeamSubmissionStats>();
 			Map<String, UserSubmissionStats> users = new TreeMap<String, UserSubmissionStats>();
-			Map<Date, Integer> submissionsPerWeek = new TreeMap<Date, Integer>();
+			SortedMap<Date, Integer> submissionsPerWeek = new TreeMap<Date, Integer>();
 			for (int offset=0; offset<total; offset+=PAGE_SIZE) {
 				PaginatedResults<SubmissionBundle> submissionPGs = synapseClient.getAllSubmissionBundles(eid, offset, PAGE_SIZE);
 				total = (int)submissionPGs.getTotalNumberOfResults();
@@ -173,13 +177,17 @@ public class EvaluationStatistics {
 			// submissions per week
 			if (!submissionsPerWeek.isEmpty()) {
 				sb.append("\n###Submissions per week\n");
-				if (CREATE_WEEKLY_SUBMISSION_PLOT) {
-					File file = createWeeklySubmissionPlot(eid, submissionsPerWeek);
+				if (CREATE_WEEKLY_SUBMISSION_PLOT) { 
+					// TODO just one plot
+					File file = createWeeklySubmissionPlot(eid, submissionsPerWeek, false);
 					wikiContent.addFile(file);
 					sb.append(imageMarkdownForFile(file)+"\n");
-				} else {
+					file = createWeeklySubmissionPlot(eid, submissionsPerWeek, true);
+					wikiContent.addFile(file);
+					sb.append(imageMarkdownForFile(file)+"\n");
+				} //else {
 					sb.append(submissionsPerWeekMarkdownTable(submissionsPerWeek)+"\n");
-				}
+				//}
 			}
 			// team statistics
 			if (!teams.isEmpty()) {
@@ -194,7 +202,7 @@ public class EvaluationStatistics {
 			String markdown = sb.toString();
 			wikiContent.setMarkdown(markdown);
 			evalIdToWikiContentMap.put(eid, wikiContent);
-			if (evalCount++>=9) break; // TEMPORARY
+			if (evalCount++>=9) break; // TODO remove
 		}
 
 		// now we combine all the Evaluations under a project into one
@@ -449,42 +457,56 @@ public class EvaluationStatistics {
 		return beginningOfWeek.toDate();
 	}
 	
-	public static Property getMonthForDate(Date date) {
-		// TODO:  This seems to be in local time, not UTC
-		DateTime dateTime = new DateTime(date, DateTimeZone.UTC);
-		return dateTime.monthOfYear();
+	// for fine tuning plot
+	public static void showPlot() {
+		SortedMap<Date,Integer> input = new TreeMap<Date,Integer>();
+		try {
+			input.put(DATE_FORMAT.parse("2014-01-01"), 5);
+			input.put(DATE_FORMAT.parse("2014-01-08"), 6);
+			input.put(DATE_FORMAT.parse("2014-01-15"), 7);
+			input.put(DATE_FORMAT.parse("2014-01-22"), 5);
+			input.put(DATE_FORMAT.parse("2014-01-29"), 3);
+			input.put(DATE_FORMAT.parse("2014-02-01"), 3);
+			input.put(DATE_FORMAT.parse("2014-02-08"), 4);
+			input.put(DATE_FORMAT.parse("2014-02-15"), 5);
+			input.put(DATE_FORMAT.parse("2014-02-22"), 8);
+			input.put(DATE_FORMAT.parse("2014-03-01"), 7);
+		} catch (ParseException e) {
+			throw new RuntimeException(e);
+		}
+		Chart chart = createWeeklySubmissionChart(input, false);
+	    // Show it
+	    new SwingWrapper(chart).displayChart();
 	}
-
-	public static final DateFormat MD_FORMAT = new SimpleDateFormat("MMM-dd");
-
-	public static File createWeeklySubmissionPlot(String evalId, Map<Date,Integer> input) throws IOException {
-	    List<String> weeks = new ArrayList<String>();
+	
+	public static Chart createWeeklySubmissionChart( SortedMap<Date,Integer> input, boolean bar) {
+		SortedMap<Date,Integer> filledIn = Util.fillInMissing(input, new WeekIncrementer(), 0);
+	    List<Date> weeks = new ArrayList<Date>();
 	    List<Number> submissionCounts = new ArrayList<Number>();
-	    Property lastDatesMonth=null;
-	    for (Date date : input.keySet()) {
-	    	Property thisDatesMonth = getMonthForDate(date);
-	    	if (lastDatesMonth==null || !lastDatesMonth.equals(thisDatesMonth)) {
-	    		weeks.add(MD_FORMAT.format(date));
-	    	} else {
-	    		weeks.add(".");
-	    	}
-	    	lastDatesMonth=thisDatesMonth;
-	    	submissionCounts.add(input.get(date));
+	    for (Date date : filledIn.keySet()) {
+    		weeks.add(date);
+	    	submissionCounts.add(filledIn.get(date));
 	    }
 	    
-	    
 	    // Create Chart
-	    Chart chart = new ChartBuilder().
-	    		chartType(ChartType.Bar).
-	    		width(800).height(400).
+	    ChartBuilder chartBuilder = new ChartBuilder().
+	    		width(1000).height(300).
 	    		xAxisTitle("Week").yAxisTitle("Submission Count").
-	    		theme(ChartTheme.GGPlot2).build();
+	    		theme(ChartTheme.GGPlot2);
+	    if (bar) chartBuilder = chartBuilder.chartType(ChartType.Bar);
+	    Chart chart = chartBuilder.build();
 	    
-	    chart.addSeries("Submissions", weeks, submissionCounts);
+	    chart.addSeries("Submission Count", weeks, submissionCounts);
+	    
+		return chart;
+	}
+
+	public static File createWeeklySubmissionPlot(String evalId, SortedMap<Date,Integer> input, boolean bar) throws IOException {
+		Chart chart = createWeeklySubmissionChart(input, bar);
 
 	 
 	    String tempDir = System.getProperty("java.io.tmpdir");
-		File file = new File(tempDir, "weeklySubmissions_"+evalId+".jpg");
+		File file = new File(tempDir, "weeklySubmissions_"+evalId+(bar?"_bar":"")+".jpg");
 //	    BitmapEncoder.savePNG(chart, "./Sample_Chart.png");
 //	    BitmapEncoder.savePNGWithDPI(chart, "./Sample_Chart_300_DPI.png", 300);
 	    BitmapEncoder.saveJPG(chart, file.getAbsolutePath(), 0.95f);
