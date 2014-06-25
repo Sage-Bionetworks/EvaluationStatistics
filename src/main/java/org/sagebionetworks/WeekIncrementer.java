@@ -9,8 +9,7 @@ public class WeekIncrementer implements Incrementer<Date> {
 
 	public Date increment(Date date) {
 		DateTime dateTime = new DateTime(date, DateTimeZone.UTC);
-		dateTime.plusWeeks(1);
-		return dateTime.toDate();
+		return dateTime.plusWeeks(1).toDate();
 	}
 
 }

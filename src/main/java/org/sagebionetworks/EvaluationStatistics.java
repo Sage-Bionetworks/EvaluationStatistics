@@ -59,12 +59,19 @@ public class EvaluationStatistics {
 	public static void main( String[] args ) throws Exception {
 		EvaluationStatistics evaluatonStatistics = new EvaluationStatistics();
 		evaluatonStatistics.computeAndPublishEvaluationStats();
-		//evaluatonStatistics.showPlot(); TODO clean up
 		System.exit(0);
 	}
 
 	private static final int PAGE_SIZE = 50;
+	
 	private static final boolean CREATE_WEEKLY_SUBMISSION_PLOT = true;
+	
+	public static ContentType MARKDOWN_FILE_CONTENT_TYPE = ContentType.APPLICATION_OCTET_STREAM;
+
+	private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+	
+	private static final int LONG_TABLE_THRESHOLD = 20;
+
 
 	private SynapseClient synapseClient;
 	private Map<String,UserProfile> userProfileCache;
@@ -178,16 +185,12 @@ public class EvaluationStatistics {
 			if (!submissionsPerWeek.isEmpty()) {
 				sb.append("\n###Submissions per week\n");
 				if (CREATE_WEEKLY_SUBMISSION_PLOT) { 
-					// TODO just one plot
-					File file = createWeeklySubmissionPlot(eid, submissionsPerWeek, false);
+					File file = createWeeklySubmissionPlot(eid, submissionsPerWeek, true);
 					wikiContent.addFile(file);
 					sb.append(imageMarkdownForFile(file)+"\n");
-					file = createWeeklySubmissionPlot(eid, submissionsPerWeek, true);
-					wikiContent.addFile(file);
-					sb.append(imageMarkdownForFile(file)+"\n");
-				} //else {
+				} else {
 					sb.append(submissionsPerWeekMarkdownTable(submissionsPerWeek)+"\n");
-				//}
+				}
 			}
 			// team statistics
 			if (!teams.isEmpty()) {
@@ -202,7 +205,6 @@ public class EvaluationStatistics {
 			String markdown = sb.toString();
 			wikiContent.setMarkdown(markdown);
 			evalIdToWikiContentMap.put(eid, wikiContent);
-			if (evalCount++>=9) break; // TODO remove
 		}
 
 		// now we combine all the Evaluations under a project into one
@@ -267,8 +269,6 @@ public class EvaluationStatistics {
 		if (sub.getSubmitterAlias()!=null) uss.getTeams().add(sub.getSubmitterAlias());
 	}
 
-	public static ContentType MARKDOWN_FILE_CONTENT_TYPE = ContentType.APPLICATION_OCTET_STREAM;
-
 	public void createWikiPage(String projectId, String rootWikiId, String title, WikiContent wikiContent) throws Exception {
 		System.out.println("Creating wiki sub-page for "+title);
 		V2WikiPage page = new V2WikiPage();
@@ -290,7 +290,7 @@ public class EvaluationStatistics {
 		key.setWikiPageId(header.getId());
 		String markdown = synapseClient.downloadV2WikiMarkdown(key);
 		String newMarkdown = wikiContent.getMarkdown();
-		if (true || markdown==null || !markdown.equals(newMarkdown)) { // TODO remove 'true ||'
+		if (markdown==null || !markdown.equals(newMarkdown)) {
 			System.out.println("Updating wiki sub-page "+header.getId());
 			// then publish the new markdown
 			V2WikiPage page = synapseClient.getV2WikiPage(key);
@@ -345,24 +345,24 @@ public class EvaluationStatistics {
 		return sb.toString();
 	}
 
-	public static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
-
 	public static String submissionsPerWeekMarkdownTable(Map<Date,Integer> subs) {
+		boolean isLong = subs.size()>LONG_TABLE_THRESHOLD;
 		StringBuilder sb = new StringBuilder();
-		sb.append("{| class=\"short\"\n");
+		if (isLong) sb.append("{| class=\"short\"\n");
 		sb.append(markdownRow(new String[]{"week starting", "#submissions"}));
 		sb.append(markdownTableDivider(2));
 		for (Date date : subs.keySet()) {
 			sb.append(markdownRow(new String[]{DATE_FORMAT.format(date), ""+subs.get(date)}));
 		}
-		sb.append("|}");
+		if (isLong) sb.append("|}\n");
 		return sb.toString();
 	}
 
 	public static String teamStatsTable(Map<String,TeamSubmissionStats> teams) {
 		if (teams==null || teams.isEmpty()) throw new IllegalArgumentException("no data");
+		boolean isLong = teams.size()>LONG_TABLE_THRESHOLD;
 		StringBuilder sb = new StringBuilder();
-		sb.append("{| class=\"short\"\n");
+		if (isLong) sb.append("{| class=\"short\"\n");
 		sb.append(markdownRow(new String[]{
 				"team", 
 				"#submissions", 
@@ -382,14 +382,15 @@ public class EvaluationStatistics {
 					setToString(tss.getUsers())
 			}));
 		}
-		sb.append("|}");
+		if (isLong) sb.append("|}\n");
 		return sb.toString();
 	}
 
 	public static String userStatsTable(Map<String,UserSubmissionStats> users) {
 		if (users==null || users.isEmpty()) throw new IllegalArgumentException("no data");
+		boolean isLong = users.size()>LONG_TABLE_THRESHOLD;
 		StringBuilder sb = new StringBuilder();
-		sb.append("{| class=\"short\"\n");
+		if (isLong) sb.append("{| class=\"short\"\n");
 		sb.append(markdownRow(new String[]{
 				"participant", 
 				"#submissions", 
@@ -409,7 +410,7 @@ public class EvaluationStatistics {
 					setToString(tss.getTeams())
 			}));
 		}
-		sb.append("|}");
+		if (isLong) sb.append("|}\n");
 		return sb.toString();
 	}
 
@@ -457,28 +458,7 @@ public class EvaluationStatistics {
 		return beginningOfWeek.toDate();
 	}
 	
-	// for fine tuning plot
-	public static void showPlot() {
-		SortedMap<Date,Integer> input = new TreeMap<Date,Integer>();
-		try {
-			input.put(DATE_FORMAT.parse("2014-01-01"), 5);
-			input.put(DATE_FORMAT.parse("2014-01-08"), 6);
-			input.put(DATE_FORMAT.parse("2014-01-15"), 7);
-			input.put(DATE_FORMAT.parse("2014-01-22"), 5);
-			input.put(DATE_FORMAT.parse("2014-01-29"), 3);
-			input.put(DATE_FORMAT.parse("2014-02-01"), 3);
-			input.put(DATE_FORMAT.parse("2014-02-08"), 4);
-			input.put(DATE_FORMAT.parse("2014-02-15"), 5);
-			input.put(DATE_FORMAT.parse("2014-02-22"), 8);
-			input.put(DATE_FORMAT.parse("2014-03-01"), 7);
-		} catch (ParseException e) {
-			throw new RuntimeException(e);
-		}
-		Chart chart = createWeeklySubmissionChart(input, false);
-	    // Show it
-	    new SwingWrapper(chart).displayChart();
-	}
-	
+	// if 'bar' is true then make a bar plot, else make a line plot
 	public static Chart createWeeklySubmissionChart( SortedMap<Date,Integer> input, boolean bar) {
 		SortedMap<Date,Integer> filledIn = Util.fillInMissing(input, new WeekIncrementer(), 0);
 	    List<Date> weeks = new ArrayList<Date>();
@@ -503,18 +483,12 @@ public class EvaluationStatistics {
 
 	public static File createWeeklySubmissionPlot(String evalId, SortedMap<Date,Integer> input, boolean bar) throws IOException {
 		Chart chart = createWeeklySubmissionChart(input, bar);
-
-	 
 	    String tempDir = System.getProperty("java.io.tmpdir");
 		File file = new File(tempDir, "weeklySubmissions_"+evalId+(bar?"_bar":"")+".jpg");
-//	    BitmapEncoder.savePNG(chart, "./Sample_Chart.png");
-//	    BitmapEncoder.savePNGWithDPI(chart, "./Sample_Chart_300_DPI.png", 300);
 	    BitmapEncoder.saveJPG(chart, file.getAbsolutePath(), 0.95f);
 	    return file;
 	}
 	
-
-
 	private static Properties properties = null;
 
 	public static void initProperties() {
