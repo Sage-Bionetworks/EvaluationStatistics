@@ -1,20 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.sagebionetworks</groupId>
-  <artifactId>EvaluationStatistics</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <packaging>jar</packaging>
+	<groupId>org.sagebionetworks</groupId>
+	<artifactId>EvaluationStatistics</artifactId>
+	<version>1.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
 
-  <name>EvaluationStatistics</name>
-  <url>http://maven.apache.org</url>
+	<name>EvaluationStatistics</name>
+	<url>http://maven.apache.org</url>
 
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-  
-  	<repositories>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<repositories>
 		<repository>
 			<id>mvnrepository</id>
 			<url>http://repo1.maven.org/maven2</url>
@@ -44,11 +45,6 @@
 			<url>https://repository.apache.org/content/repositories/releases/
 			</url>
 		</repository>
-		
-		    <repository>
-      <id>erichseifert.de</id>
-      <url>http://mvn.erichseifert.de/maven2</url>
-    </repository>
 	</repositories>
 
 	<dependencies>
@@ -57,32 +53,32 @@
 			<artifactId>synapseJavaClient</artifactId>
 			<version>48.0</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>org.sagebionetworks</groupId>
 			<artifactId>lib-communicationUtilities</artifactId>
 			<version>48.0</version>
 		</dependency>
-		
-				
-      <dependency>
-      	<groupId>junit</groupId>
-      	<artifactId>junit</artifactId>
-      	<scope>test</scope>
-       <version>4.11</version>
-      </dependency>
-    
-    <dependency>
-      <groupId>de.erichseifert.gral</groupId>
-      <artifactId>gral-core</artifactId>
-      <version>0.10</version>
-    </dependency>
-    
-    <dependency>
-  <groupId>joda-time</groupId>
-  <artifactId>joda-time</artifactId>
-  <version>2.3</version>
-</dependency>	
 
-  </dependencies>
+
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+			<version>4.11</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.xeiam.xchart</groupId>
+			<artifactId>xchart</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>joda-time</groupId>
+			<artifactId>joda-time</artifactId>
+			<version>2.3</version>
+		</dependency>
+
+	</dependencies>
 </project>
