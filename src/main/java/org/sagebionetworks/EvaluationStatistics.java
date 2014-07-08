@@ -33,9 +33,12 @@ import org.sagebionetworks.evaluation.model.Submission;
 import org.sagebionetworks.evaluation.model.SubmissionBundle;
 import org.sagebionetworks.evaluation.model.SubmissionStatus;
 import org.sagebionetworks.evaluation.model.SubmissionStatusEnum;
+import org.sagebionetworks.repo.model.ACCESS_TYPE;
+import org.sagebionetworks.repo.model.AccessControlList;
 import org.sagebionetworks.repo.model.ObjectType;
 import org.sagebionetworks.repo.model.PaginatedResults;
 import org.sagebionetworks.repo.model.Project;
+import org.sagebionetworks.repo.model.ResourceAccess;
 import org.sagebionetworks.repo.model.UserProfile;
 import org.sagebionetworks.repo.model.dao.WikiPageKey;
 import org.sagebionetworks.repo.model.file.FileHandle;
@@ -92,6 +95,8 @@ public class EvaluationStatistics {
 	}
 
 	public void computeAndPublishEvaluationStats() throws Exception {
+		UserProfile myUserProfile = synapseClient.getMyProfile();
+		Long myPrincipalId = Long.parseLong(myUserProfile.getOwnerId());
 		String wikiProjectId = getProperty("PROJECT_ID");
 		Map<String, V2WikiHeader> pageMap = getWikiPages(wikiProjectId);
 		V2WikiPage rootPage = synapseClient.getV2RootWikiPage(wikiProjectId, ObjectType.ENTITY);
@@ -100,12 +105,23 @@ public class EvaluationStatistics {
 		PaginatedResults<Evaluation> evalPGs = synapseClient.getEvaluationsPaginated(0, Integer.MAX_VALUE);
 		System.out.println("There are "+evalPGs.getTotalNumberOfResults()+" evaluations in the system.");
 		List<Evaluation> evals = evalPGs.getResults();
-		if (evals.size()!=evalPGs.getTotalNumberOfResults()) throw new IllegalStateException();
+		// it seems that 'totalNumberOfResults' includes entries that are not returned in '.getResults()'
+		if (evals.size()>evalPGs.getTotalNumberOfResults()) throw new IllegalStateException();
 		Map<String, List<String>> parentProjectNameToEvalIdMap = new TreeMap<String, List<String>>();
 		Map<String, WikiContent> evalIdToWikiContentMap = new HashMap<String,WikiContent>();
 		for (Evaluation eval : evals) {
 			String eid = eval.getId();
 			System.out.println(eid+" "+eval.getName());
+			AccessControlList acl = synapseClient.getEvaluationAcl(eid);
+			boolean foundIt = false;
+			// note: this isn't perfect:  If access is granted to a group I'm in then this check won't pass
+			for (ResourceAccess ra : acl.getResourceAccess()) {
+				if (ra.getAccessType().contains(ACCESS_TYPE.READ_PRIVATE_SUBMISSION) && ((long)ra.getPrincipalId())==myPrincipalId) {
+					foundIt = true;
+					break;
+				}
+			}
+			if (!foundIt) continue; // skip this evaluation
 			long total = Integer.MAX_VALUE;
 			Map<SubmissionStatusEnum,Integer> statusToCountMap = new HashMap<SubmissionStatusEnum,Integer>();
 			Map<String, TeamSubmissionStats> teams = new TreeMap<String, TeamSubmissionStats>();
