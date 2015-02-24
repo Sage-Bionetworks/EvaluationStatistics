@@ -51,13 +51,13 @@
 		<dependency>
 			<groupId>org.sagebionetworks</groupId>
 			<artifactId>synapseJavaClient</artifactId>
-			<version>48.0</version>
+			<version>79.0</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.sagebionetworks</groupId>
 			<artifactId>lib-communicationUtilities</artifactId>
-			<version>48.0</version>
+			<version>79.0</version>
 		</dependency>
 
 
