@@ -208,9 +208,17 @@ public class EvaluationStatistics {
 			wikiContent.setMarkdown(markdown);
 			evalIdToWikiContentMap.put(eid, wikiContent);
 			// record the evaluation as a child of its parent project
-			Project parentProject = synapseClient.getEntity(eval.getContentSource(), Project.class);
-			String parentProjectName = parentProject.getName();
-			if (parentProjectName==null) parentProjectName = eval.getContentSource();
+			String parentProjectName = eval.getContentSource();
+			try {
+				Project parentProject = synapseClient.getEntity(eval.getContentSource(), Project.class);
+				if (parentProject.getName()!=null) {
+					parentProjectName = parentProject.getName();
+				}
+			} catch (SynapseException e) {
+				// if we can't retrieve the parent project, 
+				// just continue, using the syn ID as the project name
+			}
+
 			List<String> evalIds;
 			if (parentProjectNameToEvalIdMap.containsKey(parentProjectName)) {
 				evalIds = parentProjectNameToEvalIdMap.get(parentProjectName);
