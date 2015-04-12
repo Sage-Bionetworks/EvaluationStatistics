@@ -12,6 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -31,6 +32,7 @@ import org.sagebionetworks.downloadtools.FileUtils;
 import org.sagebionetworks.evaluation.model.Evaluation;
 import org.sagebionetworks.evaluation.model.Submission;
 import org.sagebionetworks.evaluation.model.SubmissionBundle;
+import org.sagebionetworks.evaluation.model.SubmissionContributor;
 import org.sagebionetworks.evaluation.model.SubmissionStatus;
 import org.sagebionetworks.evaluation.model.SubmissionStatusEnum;
 import org.sagebionetworks.repo.model.ACCESS_TYPE;
@@ -39,6 +41,7 @@ import org.sagebionetworks.repo.model.ObjectType;
 import org.sagebionetworks.repo.model.PaginatedResults;
 import org.sagebionetworks.repo.model.Project;
 import org.sagebionetworks.repo.model.ResourceAccess;
+import org.sagebionetworks.repo.model.Team;
 import org.sagebionetworks.repo.model.UserProfile;
 import org.sagebionetworks.repo.model.dao.WikiPageKey;
 import org.sagebionetworks.repo.model.file.FileHandle;
@@ -127,6 +130,7 @@ public class EvaluationStatistics {
 			Map<String, TeamSubmissionStats> teams = new TreeMap<String, TeamSubmissionStats>();
 			Map<String, UserSubmissionStats> users = new TreeMap<String, UserSubmissionStats>();
 			SortedMap<Date, Integer> submissionsPerWeek = new TreeMap<Date, Integer>();
+			Map<String,Team> teamMap = new HashMap<String,Team>();
 			for (int offset=0; offset<total; offset+=PAGE_SIZE) {
 				PaginatedResults<SubmissionBundle> submissionPGs = synapseClient.getAllSubmissionBundles(eid, offset, PAGE_SIZE);
 				total = (int)submissionPGs.getTotalNumberOfResults();
@@ -134,22 +138,44 @@ public class EvaluationStatistics {
 				for (int i=0; i<submissionBundles.size(); i++) {
 					Submission sub = submissionBundles.get(i).getSubmission();
 					SubmissionStatus status = submissionBundles.get(i).getSubmissionStatus();
-					String userName = getUserProfile(sub.getUserId()).getUserName();
-					if (sub.getSubmitterAlias()!=null) {
-						TeamSubmissionStats tss = teams.get(sub.getSubmitterAlias());
-						if (tss==null) {
-							tss = new TeamSubmissionStats(sub.getSubmitterAlias());
-							teams.put(sub.getSubmitterAlias(), tss);
+					Set<String> contributorIds = new HashSet<String>();
+					contributorIds.add(sub.getUserId());
+					Set<SubmissionContributor> contributors = sub.getContributors();
+					if (contributors!=null) {
+						for (SubmissionContributor sc : contributors) {
+							contributorIds.add(sc.getPrincipalId());
 						}
-						updateTSS(tss, sub, status, userName);
 					}
-					if (userName!=null) {
+					Set<String> contributorNames = new HashSet<String>();
+					for (String contributorId : contributorIds) {
+						contributorNames.add(getUserProfile(contributorId).getUserName());
+					}
+					String teamName=null;
+					String teamId = sub.getTeamId();
+					if (teamId!=null) {
+						Team team = teamMap.get(teamId);
+						if (team==null) {
+							team = synapseClient.getTeam(teamId);
+							teamMap.put(teamId, team);
+						}
+						teamName=team.getName();
+					}
+					if (teamName==null) teamName=sub.getSubmitterAlias();
+					if (teamName!=null) {
+						TeamSubmissionStats tss = teams.get(teamName);
+						if (tss==null) {
+							tss = new TeamSubmissionStats(teamName);
+							teams.put(teamName, tss);
+						}
+						updateTSS(tss, sub, status, contributorNames);
+					}
+					for (String userName : contributorNames) {
 						UserSubmissionStats uss = users.get(userName);
 						if (uss==null) {
 							uss = new UserSubmissionStats(userName);
 							users.put(userName, uss);
 						}
-						updateUSS(uss, sub, status);
+						updateUSS(uss, sub, status, teamName);
 					}
 					Date week = getWeekForDate(sub.getCreatedOn());
 					int statusCount = 0;
@@ -278,7 +304,7 @@ public class EvaluationStatistics {
 		return "${image?fileName="+urlEncodedName+"&align=None&scale=100}";
 	}
 
-	private static void updateTSS(TeamSubmissionStats tss, Submission sub, SubmissionStatus status, String userName) {
+	private static void updateTSS(TeamSubmissionStats tss, Submission sub, SubmissionStatus status, Set<String> userNames) {
 		tss.setSubmissionCount(tss.getSubmissionCount()+1);
 		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
 			tss.setScoredCount(tss.getScoredCount()+1);
@@ -289,10 +315,10 @@ public class EvaluationStatistics {
 		if (tss.getLastSubmission()==null || tss.getLastSubmission().compareTo(sub.getCreatedOn())<0) {
 			tss.setLastSubmission(sub.getCreatedOn());
 		}
-		if (userName!=null) tss.getUsers().add(userName);
+		tss.getUsers().addAll(userNames);
 	}
 
-	private static void updateUSS(UserSubmissionStats uss, Submission sub, SubmissionStatus status) {
+	private static void updateUSS(UserSubmissionStats uss, Submission sub, SubmissionStatus status, String teamName) {
 		uss.setSubmissionCount(uss.getSubmissionCount()+1);
 		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
 			uss.setScoredCount(uss.getScoredCount()+1);
@@ -303,7 +329,7 @@ public class EvaluationStatistics {
 		if (uss.getLastSubmission()==null || uss.getLastSubmission().compareTo(sub.getCreatedOn())<0) {
 			uss.setLastSubmission(sub.getCreatedOn());
 		}
-		if (sub.getSubmitterAlias()!=null) uss.getTeams().add(sub.getSubmitterAlias());
+		if (teamName!=null) uss.getTeams().add(teamName);
 	}
 
 	public void createWikiPage(String projectId, String rootWikiId, String title, WikiContent wikiContent) throws Exception {
