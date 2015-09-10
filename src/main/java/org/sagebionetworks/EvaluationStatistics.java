@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -35,10 +36,10 @@ import org.sagebionetworks.evaluation.model.SubmissionBundle;
 import org.sagebionetworks.evaluation.model.SubmissionContributor;
 import org.sagebionetworks.evaluation.model.SubmissionStatus;
 import org.sagebionetworks.evaluation.model.SubmissionStatusEnum;
+import org.sagebionetworks.reflection.model.PaginatedResults;
 import org.sagebionetworks.repo.model.ACCESS_TYPE;
 import org.sagebionetworks.repo.model.AccessControlList;
 import org.sagebionetworks.repo.model.ObjectType;
-import org.sagebionetworks.repo.model.PaginatedResults;
 import org.sagebionetworks.repo.model.Project;
 import org.sagebionetworks.repo.model.ResourceAccess;
 import org.sagebionetworks.repo.model.Team;
@@ -64,7 +65,7 @@ public class EvaluationStatistics {
 		evaluatonStatistics.computeAndPublishEvaluationStats();
 		System.exit(0);
 	}
-
+	
 	private static final int PAGE_SIZE = 50;
 	
 	private static final boolean CREATE_WEEKLY_SUBMISSION_PLOT = true;
@@ -372,7 +373,7 @@ public class EvaluationStatistics {
 
 	public String uploadMarkdown(String markdown) throws UnsupportedEncodingException, IOException, SynapseException {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		FileUtils.writeCompressedString(markdown, baos);
+		FileUtils.writeString(markdown, Charset.forName("utf-8"), true, baos);
 		String markdownFileHandleId = synapseClient.uploadToFileHandle(baos.toByteArray(), MARKDOWN_FILE_CONTENT_TYPE);
 		return markdownFileHandleId;
 	}
