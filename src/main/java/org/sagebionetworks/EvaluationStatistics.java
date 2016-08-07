@@ -49,6 +49,8 @@ import org.sagebionetworks.repo.model.file.FileHandle;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiHeader;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiPage;
 import org.sagebionetworks.schema.adapter.JSONObjectAdapterException;
+import org.sagebionetworks.utils.DefaultHttpClientSingleton;
+import org.sagebionetworks.utils.HttpClientHelper;
 
 import com.xeiam.xchart.BitmapEncoder;
 import com.xeiam.xchart.Chart;
@@ -76,6 +78,7 @@ public class EvaluationStatistics {
 	
 	private static final int LONG_TABLE_THRESHOLD = 20;
 
+	private static final int TIMEOUT_MILLIS = 5 * 60 * 1000; // 5 minutes, as milliseconds
 
 	private SynapseClient synapseClient;
 	private Map<String,UserProfile> userProfileCache;
@@ -582,10 +585,13 @@ public class EvaluationStatistics {
 		// (could also check environment variables)
 		throw new RuntimeException("Cannot find value for "+key);
 	}	
-
+	
 	private static SynapseClient createSynapseClient() {
 		boolean staging = false;
 		SynapseClientImpl scIntern = new SynapseClientImpl();
+		HttpClientHelper.setGlobalConnectionTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
+		HttpClientHelper.setGlobalSocketTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
+
 		if (staging) {
 			scIntern.setAuthEndpoint("https://repo-staging.prod.sagebase.org/auth/v1");
 			scIntern.setRepositoryEndpoint("https://repo-staging.prod.sagebase.org/repo/v1");
