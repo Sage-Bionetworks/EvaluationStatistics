@@ -68,7 +68,7 @@ public class EvaluationStatistics {
 		System.exit(0);
 	}
 	
-	private static final int PAGE_SIZE = 50;
+	private static final int PAGE_SIZE = 10;
 	
 	private static final boolean CREATE_WEEKLY_SUBMISSION_PLOT = true;
 	
@@ -78,15 +78,13 @@ public class EvaluationStatistics {
 	
 	private static final int LONG_TABLE_THRESHOLD = 20;
 
-	private static final int TIMEOUT_MILLIS = 5 * 60 * 1000; // 5 minutes, as milliseconds
-
 	private SynapseClient synapseClient;
 	private Map<String,UserProfile> userProfileCache;
 
 	public EvaluationStatistics() throws SynapseException {
 		String synapseUserName = getProperty("SYNAPSE_USERNAME");
 		String synapsePassword = getProperty("SYNAPSE_PASSWORD");
-		synapseClient = createSynapseClient();
+		synapseClient = SynapseClientFactory.createSynapseClient();
 		synapseClient.login(synapseUserName, synapsePassword);
 
 		userProfileCache = new HashMap<String,UserProfile>();
@@ -585,23 +583,4 @@ public class EvaluationStatistics {
 		// (could also check environment variables)
 		throw new RuntimeException("Cannot find value for "+key);
 	}	
-	
-	private static SynapseClient createSynapseClient() {
-		boolean staging = false;
-		SynapseClientImpl scIntern = new SynapseClientImpl();
-		HttpClientHelper.setGlobalConnectionTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
-		HttpClientHelper.setGlobalSocketTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
-
-		if (staging) {
-			scIntern.setAuthEndpoint("https://repo-staging.prod.sagebase.org/auth/v1");
-			scIntern.setRepositoryEndpoint("https://repo-staging.prod.sagebase.org/repo/v1");
-			scIntern.setFileEndpoint("https://repo-staging.prod.sagebase.org/file/v1");
-		} else { // prod
-			scIntern.setAuthEndpoint("https://repo-prod.prod.sagebase.org/auth/v1");
-			scIntern.setRepositoryEndpoint("https://repo-prod.prod.sagebase.org/repo/v1");
-			scIntern.setFileEndpoint("https://repo-prod.prod.sagebase.org/file/v1");
-		}
-		return SynapseProfileProxy.createProfileProxy(scIntern);
-
-	}
 }
