@@ -4,38 +4,51 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.List;
 
+import org.apache.http.HttpStatus;
 import org.sagebionetworks.client.SynapseClient;
 import org.sagebionetworks.client.SynapseClientImpl;
 import org.sagebionetworks.client.SynapseProfileProxy;
-import org.sagebionetworks.utils.DefaultHttpClientSingleton;
-import org.sagebionetworks.utils.HttpClientHelper;
 
 
 public class SynapseClientFactory {
 
-	private static final int TIMEOUT_MILLIS = 5 * 60 * 1000; // 5 minutes, as milliseconds   
-
-	private static SynapseClient createSynapseClientIntern() {
-		HttpClientHelper.setGlobalConnectionTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
-		HttpClientHelper.setGlobalSocketTimeout(DefaultHttpClientSingleton.getInstance(), TIMEOUT_MILLIS);	
-		SynapseClientImpl scIntern = new SynapseClientImpl();
+	private static final List<Integer> NO_RETRY_STATUSES = Arrays.asList(
+			HttpStatus.SC_ACCEPTED, // SynapseResultNotReadyException
+			HttpStatus.SC_NOT_FOUND, // SynapseNotFoundException
+			HttpStatus.SC_BAD_REQUEST, // SynapseBadRequestException
+			HttpStatus.SC_PRECONDITION_FAILED, // SynapseConflictingUpdateException
+			HttpStatus.SC_GONE, // SynapseDeprecatedServiceException
+			HttpStatus.SC_FORBIDDEN, // SynapseForbiddenException, SynapseTermsOfUseException
+			HttpStatus.SC_UNAUTHORIZED, // SynapseUnauthorizedException
+			HttpStatus.SC_CONFLICT // 409
+		);
+		
+	private static ExtendedSynapseClient createSynapseClientIntern() {
+		ExtendedSynapseClientImpl scIntern = new ExtendedSynapseClientImpl();
 		scIntern.setAuthEndpoint("https://repo-prod.prod.sagebase.org/auth/v1");
 		scIntern.setRepositoryEndpoint("https://repo-prod.prod.sagebase.org/repo/v1");
 		scIntern.setFileEndpoint("https://repo-prod.prod.sagebase.org/file/v1");
-		return SynapseProfileProxy.createProfileProxy(scIntern);
+		
+		return  scIntern;
 	}
 
-	public static SynapseClient createSynapseClient() {
-		final SynapseClient synapseClientIntern = createSynapseClientIntern();
+	public static ExtendedSynapseClient createSynapseClient() {
+		final ExtendedSynapseClient synapseClientIntern = createSynapseClientIntern();
+		
+		final ExponentialBackoffRunner exponentialBackoffRunner = new ExponentialBackoffRunner(
+				NO_RETRY_STATUSES, ExponentialBackoffRunner.DEFAULT_NUM_RETRY_ATTEMPTS);
 
 		InvocationHandler handler = new InvocationHandler() {
 			public Object invoke(final Object proxy, final Method method, final Object[] args)
 					throws Throwable {
-				return ExponentialBackoffUtil.executeWithExponentialBackoff(new Executable<Object>() {
+				return exponentialBackoffRunner.execute(new Executable<Object>() {
 					public Object execute() throws Throwable {
 						try {
-							return method.invoke(synapseClientIntern, args);
+							Object result = method.invoke(synapseClientIntern, args);
+							return result;
 						} catch (IllegalAccessException  e) {
 							throw new RuntimeException(e);
 						} catch (InvocationTargetException e) {
@@ -46,8 +59,8 @@ public class SynapseClientFactory {
 			}
 		};
 			
-		return (SynapseClient) Proxy.newProxyInstance(SynapseClient.class.getClassLoader(),
-				new Class[] { SynapseClient.class },
+		return (ExtendedSynapseClient) Proxy.newProxyInstance(ExtendedSynapseClient.class.getClassLoader(),
+				new Class[] { ExtendedSynapseClient.class },
 				handler);
 	}
 
