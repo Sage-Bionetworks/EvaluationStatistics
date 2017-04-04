@@ -20,15 +20,18 @@ public class ExponentialBackoffRunner {
 	
 	private int numRetryAttempts;
 	private List<Integer> noRetryStatuses  = null;
+	private List<Class<? extends Exception>> noRetryExceptions = null;
 	
-	public ExponentialBackoffRunner(List<Integer> noRetryStatuses, int numRetryAttempts) {
+	public ExponentialBackoffRunner(List<Integer> noRetryStatuses, List<Class<? extends Exception>> noRetryExceptions, int numRetryAttempts) {
 		this.noRetryStatuses=noRetryStatuses;
 		this.numRetryAttempts=numRetryAttempts;
+		this.noRetryExceptions=noRetryExceptions;
 	}
 	
 	public ExponentialBackoffRunner() {
 		this.noRetryStatuses=Collections.EMPTY_LIST;
 		this.numRetryAttempts=DEFAULT_NUM_RETRY_ATTEMPTS;
+		this.noRetryExceptions=Collections.EMPTY_LIST;
 	}
 	
 	private static String exceptionMessage(Throwable e) {
@@ -66,6 +69,12 @@ public class ExponentialBackoffRunner {
 				}
 				lastException=e;
 			} catch (Exception e) {
+				for (Class<? extends Exception> exceptionClass : noRetryExceptions) {
+					if (e.getClass().equals(exceptionClass)) {
+						log.severe("Will not retry: "+exceptionMessage(e)); 
+						throw e;
+					}
+				}
 				lastException=e;
 			}
 			log.warning("Encountered exception on attempt "+i+": "+exceptionMessage(lastException));

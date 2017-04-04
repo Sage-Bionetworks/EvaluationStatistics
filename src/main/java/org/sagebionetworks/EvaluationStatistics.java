@@ -368,7 +368,12 @@ public class EvaluationStatistics {
 		key.setOwnerObjectId(projectId);
 		key.setOwnerObjectType(ObjectType.ENTITY);
 		key.setWikiPageId(header.getId());
-		String markdown = synapseClient.downloadV2WikiMarkdown(key);
+		String markdown = null;
+		try {
+			markdown = synapseClient.downloadV2WikiMarkdown(key);
+		} catch (java.util.zip.ZipException e) {
+			markdown = null;
+		}
 		String newMarkdown = wikiContent.getMarkdown();
 		if (markdown==null || !markdown.equals(newMarkdown)) {
 			System.out.println("Updating wiki sub-page "+header.getId());

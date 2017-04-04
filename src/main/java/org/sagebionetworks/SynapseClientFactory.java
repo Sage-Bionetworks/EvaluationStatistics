@@ -4,13 +4,12 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.http.HttpStatus;
-import org.sagebionetworks.client.SynapseClient;
-import org.sagebionetworks.client.SynapseClientImpl;
-import org.sagebionetworks.client.SynapseProfileProxy;
 
 
 public class SynapseClientFactory {
@@ -38,8 +37,12 @@ public class SynapseClientFactory {
 	public static ExtendedSynapseClient createSynapseClient() {
 		final ExtendedSynapseClient synapseClientIntern = createSynapseClientIntern();
 		
+		List<Class<? extends Exception>> noRetryExceptions = new ArrayList<Class<? extends Exception>>();
+		noRetryExceptions.add(java.util.zip.ZipException.class);
 		final ExponentialBackoffRunner exponentialBackoffRunner = new ExponentialBackoffRunner(
-				NO_RETRY_STATUSES, ExponentialBackoffRunner.DEFAULT_NUM_RETRY_ATTEMPTS);
+				NO_RETRY_STATUSES, 
+				noRetryExceptions,
+				ExponentialBackoffRunner.DEFAULT_NUM_RETRY_ATTEMPTS);
 
 		InvocationHandler handler = new InvocationHandler() {
 			public Object invoke(final Object proxy, final Method method, final Object[] args)
