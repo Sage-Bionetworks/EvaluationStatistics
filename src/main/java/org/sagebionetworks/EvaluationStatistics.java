@@ -1,6 +1,7 @@
 package org.sagebionetworks;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -21,11 +22,14 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.entity.ContentType;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.sagebionetworks.client.SynapseClient;
 import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.evaluation.model.Evaluation;
 import org.sagebionetworks.evaluation.model.Submission;
@@ -47,6 +51,7 @@ import org.sagebionetworks.repo.model.file.FileHandle;
 import org.sagebionetworks.repo.model.file.S3FileHandle;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiHeader;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiPage;
+import org.sagebionetworks.repo.model.wiki.WikiPage;
 import org.sagebionetworks.schema.adapter.JSONObjectAdapterException;
 
 import com.xeiam.xchart.BitmapEncoder;
@@ -89,6 +94,8 @@ public class EvaluationStatistics {
 
 		userProfileCache = new HashMap<String,UserProfile>();
 	}
+	
+	public SynapseClient getSynapseClient() {return synapseClient;} // for testing
 
 	public UserProfile getUserProfile(String userId) throws SynapseException {
 		UserProfile result = userProfileCache.get(userId);
@@ -351,16 +358,15 @@ public class EvaluationStatistics {
 
 	public void createWikiPage(String projectId, String rootWikiId, String title, WikiContent wikiContent) throws Exception {
 		System.out.println("Creating wiki sub-page for "+title);
-		V2WikiPage page = new V2WikiPage();
+		WikiPage page = new WikiPage();
 		page.setParentWikiId(rootWikiId);
 		page.setTitle(title);
-		String markdownFileHandleId = uploadMarkdown(wikiContent.getMarkdown());
-		page.setMarkdownFileHandleId(markdownFileHandleId);
+		page.setMarkdown(wikiContent.getMarkdown());
 		List<FileHandle> fileHandles = createFileHandlesFromFiles(wikiContent.getFiles());
 		List<String> fileHandleIds = new ArrayList<String>();
 		for (FileHandle fileHandle : fileHandles) fileHandleIds.add(fileHandle.getId());
 		page.setAttachmentFileHandleIds(fileHandleIds);
-		synapseClient.createV2WikiPage(projectId, ObjectType.ENTITY, page);
+		synapseClient.createWikiPage(projectId, ObjectType.ENTITY, page);
 	}
 
 	public void updateWikiPage(String projectId, V2WikiHeader header, WikiContent wikiContent) throws ClientProtocolException, FileNotFoundException, IOException, SynapseException, JSONObjectAdapterException {
@@ -378,14 +384,13 @@ public class EvaluationStatistics {
 		if (markdown==null || !markdown.equals(newMarkdown)) {
 			System.out.println("Updating wiki sub-page "+header.getId());
 			// then publish the new markdown
-			V2WikiPage page = synapseClient.getV2WikiPage(key);
-			String markdownFileHandleId = uploadMarkdown(newMarkdown);
-			page.setMarkdownFileHandleId(markdownFileHandleId);
+			WikiPage page = synapseClient.getWikiPage(key);
+			page.setMarkdown(newMarkdown);
 			List<FileHandle> fileHandles = createFileHandlesFromFiles(wikiContent.getFiles());
 			List<String> fileHandleIds = new ArrayList<String>();
 			for (FileHandle fileHandle : fileHandles) fileHandleIds.add(fileHandle.getId());
 			page.setAttachmentFileHandleIds(fileHandleIds);
-			synapseClient.updateV2WikiPage(projectId, ObjectType.ENTITY, page);
+			synapseClient.updateWikiPage(projectId, ObjectType.ENTITY, page);
 		} else {
 			System.out.println("No update needed for wiki sub-page "+header.getId());
 		}
@@ -405,14 +410,6 @@ public class EvaluationStatistics {
 			}
 		}
 		return result;	
-	}
-
-	public String uploadMarkdown(String markdown) throws UnsupportedEncodingException, IOException, SynapseException {
-		byte[] markdownBytes = markdown.getBytes(Charset.forName("utf-8"));
-		ByteArrayInputStream bais = new ByteArrayInputStream(markdownBytes);
-		S3FileHandle fileHandle = synapseClient.multipartUpload(bais, (long)markdownBytes.length, "markdown.txt", 
-				MARKDOWN_FILE_CONTENT_TYPE.toString(), null, true, true);
-		return fileHandle.getId();
 	}
 
 	public Map<String, V2WikiHeader> getWikiPages(String projectId) throws SynapseException, JSONObjectAdapterException {
