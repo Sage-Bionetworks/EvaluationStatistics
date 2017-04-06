@@ -297,7 +297,7 @@ public class EvaluationStatistics {
 					createWikiPage(wikiProjectId, rootPage.getId(), parentProjectName, projectWikiContent);
 				} else {
 					// need to update page
-					updateWikiPage(wikiProjectId, header, projectWikiContent);
+					updateWikiPage(wikiProjectId, header.getId(), projectWikiContent);
 				}
 			} catch (Exception e) {
 				// log the exception and go on to the next one
@@ -356,7 +356,7 @@ public class EvaluationStatistics {
 		if (teamName!=null) uss.getTeams().add(teamName);
 	}
 
-	public void createWikiPage(String projectId, String rootWikiId, String title, WikiContent wikiContent) throws Exception {
+	public WikiPage createWikiPage(String projectId, String rootWikiId, String title, WikiContent wikiContent) throws Exception {
 		System.out.println("Creating wiki sub-page for "+title);
 		WikiPage page = new WikiPage();
 		page.setParentWikiId(rootWikiId);
@@ -366,14 +366,14 @@ public class EvaluationStatistics {
 		List<String> fileHandleIds = new ArrayList<String>();
 		for (FileHandle fileHandle : fileHandles) fileHandleIds.add(fileHandle.getId());
 		page.setAttachmentFileHandleIds(fileHandleIds);
-		synapseClient.createWikiPage(projectId, ObjectType.ENTITY, page);
+		return synapseClient.createWikiPage(projectId, ObjectType.ENTITY, page);
 	}
 
-	public void updateWikiPage(String projectId, V2WikiHeader header, WikiContent wikiContent) throws ClientProtocolException, FileNotFoundException, IOException, SynapseException, JSONObjectAdapterException {
+	public void updateWikiPage(String projectId, String wikiPageId, WikiContent wikiContent) throws ClientProtocolException, FileNotFoundException, IOException, SynapseException, JSONObjectAdapterException {
 		WikiPageKey key = new WikiPageKey();
 		key.setOwnerObjectId(projectId);
 		key.setOwnerObjectType(ObjectType.ENTITY);
-		key.setWikiPageId(header.getId());
+		key.setWikiPageId(wikiPageId);
 		String markdown = null;
 		try {
 			markdown = synapseClient.downloadV2WikiMarkdown(key);
@@ -382,17 +382,24 @@ public class EvaluationStatistics {
 		}
 		String newMarkdown = wikiContent.getMarkdown();
 		if (markdown==null || !markdown.equals(newMarkdown)) {
-			System.out.println("Updating wiki sub-page "+header.getId());
+			System.out.println("Updating wiki sub-page "+wikiPageId);
 			// then publish the new markdown
-			WikiPage page = synapseClient.getWikiPage(key);
+			V2WikiPage v2page = synapseClient.getV2WikiPage(key);
+			WikiPage page = new WikiPage();
+			page.setId(v2page.getId());
+			page.setEtag(v2page.getEtag());
+			page.setParentWikiId(v2page.getParentWikiId());
+			page.setTitle(v2page.getTitle());
 			page.setMarkdown(newMarkdown);
+			page.setCreatedBy(v2page.getCreatedBy());
+			page.setCreatedOn(v2page.getCreatedOn());
 			List<FileHandle> fileHandles = createFileHandlesFromFiles(wikiContent.getFiles());
 			List<String> fileHandleIds = new ArrayList<String>();
 			for (FileHandle fileHandle : fileHandles) fileHandleIds.add(fileHandle.getId());
 			page.setAttachmentFileHandleIds(fileHandleIds);
 			synapseClient.updateWikiPage(projectId, ObjectType.ENTITY, page);
 		} else {
-			System.out.println("No update needed for wiki sub-page "+header.getId());
+			System.out.println("No update needed for wiki sub-page "+wikiPageId);
 		}
 
 	}
