@@ -16,3 +16,10 @@
 hs_err_pid*
 /bin
 /target
+
+
+**/.DS_Store
+
+
+# src/main/resources/global.properties is not to be checked in to Git
+src/main/resources/global.properties
