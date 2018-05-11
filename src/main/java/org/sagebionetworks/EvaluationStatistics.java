@@ -1,7 +1,5 @@
 package org.sagebionetworks;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -9,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -22,8 +19,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.entity.ContentType;
@@ -48,7 +43,6 @@ import org.sagebionetworks.repo.model.UserProfile;
 import org.sagebionetworks.repo.model.auth.LoginRequest;
 import org.sagebionetworks.repo.model.dao.WikiPageKey;
 import org.sagebionetworks.repo.model.file.FileHandle;
-import org.sagebionetworks.repo.model.file.S3FileHandle;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiHeader;
 import org.sagebionetworks.repo.model.v2.wiki.V2WikiPage;
 import org.sagebionetworks.repo.model.wiki.WikiPage;
@@ -79,6 +73,11 @@ public class EvaluationStatistics {
 	private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
 	private static final int LONG_TABLE_THRESHOLD = 20;
+	
+	private static final String ROOT_WIKI_TEMPLATE = "The pages below show the statistics of all Evaluation Queues in Synapse, organized by their parent Project.\n\n" + 
+			"To add a challenge to the list, see the instructions under \"Enable Challenge Statistics\" "+
+			"in the [Challenge Administration Instructions](http://docs.synapse.org/articles/challenge_administration.html).\n\n"+
+			"####Summary statistics:";
 
 	private ExtendedSynapseClient synapseClient;
 	private Map<String,UserProfile> userProfileCache;
@@ -117,11 +116,12 @@ public class EvaluationStatistics {
 		Map<String, List<Evaluation>> parentProjectNameToEvalMap = new TreeMap<String, List<Evaluation>>();
 		Map<Evaluation, WikiContent> evalToWikiContentMap = new HashMap<Evaluation,WikiContent>();
 		long evaluationTotal = 1;
-		int evaluationPageSize = Integer.MAX_VALUE; // change to PAGE_SIZE once PLFM-4331 is done
+		int evaluationPageSize = PAGE_SIZE;
+		long numberOfSubmissionsAcrossAllChallenges = 0L;
+		Set<String> usersAcrossChallenges = new HashSet<String>();
 		for (int evaluationOffset=0; evaluationOffset<evaluationTotal; evaluationOffset+=evaluationPageSize) {
 			PaginatedResults<Evaluation> evalPGs = synapseClient
 					.getReadableEvaluationsPaginated(evaluationOffset, evaluationPageSize);
-			System.out.println("evalPGs.getTotalNumberOfResults(): "+evalPGs.getTotalNumberOfResults());
 			evaluationTotal = evalPGs.getTotalNumberOfResults();
 			for (Evaluation eval : evalPGs.getResults()) {
 				String eid = eval.getId();
@@ -146,9 +146,9 @@ public class EvaluationStatistics {
 				Map<String, UserSubmissionStats> users = new TreeMap<String, UserSubmissionStats>();
 				SortedMap<Date, Integer> submissionsPerWeek = new TreeMap<Date, Integer>();
 				Map<String,Team> teamMap = new HashMap<String,Team>();
-				for (int offset=0; offset<totalNumberOfSubmissions; offset+=PAGE_SIZE) {
+				for (long offset=0; offset<totalNumberOfSubmissions; offset+=PAGE_SIZE) {
 					PaginatedResults<SubmissionBundle> submissionPGs = synapseClient.getAllSubmissionBundles(eid, offset, PAGE_SIZE);
-					totalNumberOfSubmissions = (int)submissionPGs.getTotalNumberOfResults();
+					totalNumberOfSubmissions = submissionPGs.getTotalNumberOfResults();
 					List<SubmissionBundle> submissionBundles = submissionPGs.getResults();
 					for (int i=0; i<submissionBundles.size(); i++) {
 						Submission sub = submissionBundles.get(i).getSubmission();
@@ -205,6 +205,8 @@ public class EvaluationStatistics {
 						submissionsPerWeek.put(week, submissionsPerWeekCount+1);
 					}
 				}
+				numberOfSubmissionsAcrossAllChallenges += totalNumberOfSubmissions;
+				usersAcrossChallenges.addAll(users.keySet());
 
 				if (totalNumberOfSubmissions==0) continue; // if there are no entries, don't build a wiki
 				WikiContent wikiContent = new WikiContent();
@@ -271,6 +273,18 @@ public class EvaluationStatistics {
 				evals.add(eval);
 			}
 		}
+		
+		//
+		long numberOfchallenges = parentProjectNameToEvalMap.size();
+		long numberOfDistinctChallengeParticipantsAcrossAllChallenges=usersAcrossChallenges.size();
+		WikiContent rootWikiContent = new WikiContent();
+		StringBuilder rootMarkdown = new StringBuilder();
+		rootMarkdown.append(ROOT_WIKI_TEMPLATE);
+		rootMarkdown.append("\nNumber of challenges: "+numberOfchallenges);
+		rootMarkdown.append("\nNumber of distinct challenge participants across all challenges: "+numberOfDistinctChallengeParticipantsAcrossAllChallenges);
+		rootMarkdown.append("\nNumber of submissions across all challenges: "+numberOfSubmissionsAcrossAllChallenges);
+		rootWikiContent.setMarkdown(rootMarkdown.toString());
+		updateWikiPage(wikiProjectId, rootPage.getId(), rootWikiContent);
 
 		// now we combine all the Evaluations under a project into one
 		System.out.println(parentProjectNameToEvalMap.size()+" subpages to create/update...");
