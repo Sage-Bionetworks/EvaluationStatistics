@@ -1,0 +1,15 @@
+language: ruby
+
+services:
+  - docker
+
+before_install:
+- docker pull sagebionetworks/evaluationstatistics
+
+script: 
+- >
+  docker run --rm -it 
+  -e SYNAPSE_USERNAME=${SYNAPSE_USERNAME}
+  -e SYNAPSE_PASSWORD=${SYNAPSE_PASSWORD}
+  -e PROJECT_ID=${PROJECT_ID}
+  sagebionetworks/evaluationstatistics
