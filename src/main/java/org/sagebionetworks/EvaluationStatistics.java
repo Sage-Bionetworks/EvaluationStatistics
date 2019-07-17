@@ -620,7 +620,7 @@ public class EvaluationStatistics {
 		InputStream is = null;
 		try {
 			is = EvaluationStatistics.class.getClassLoader().getResourceAsStream("global.properties");
-			properties.load(is);
+			if (is!=null) properties.load(is);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} finally {
@@ -633,12 +633,16 @@ public class EvaluationStatistics {
 	}
 
 	public static String getProperty(String key) {
+		return getProperty(key, false);
+	}
+	
+	public static String getProperty(String key, boolean missingOK) {
 		initProperties();
 		String commandlineOption = System.getProperty(key);
 		if (commandlineOption!=null) return commandlineOption;
 		String embeddedProperty = properties.getProperty(key);
 		if (embeddedProperty!=null) return embeddedProperty;
 		// (could also check environment variables)
-		throw new RuntimeException("Cannot find value for "+key);
+		if (missingOK) return null; else throw new RuntimeException("Cannot find value for "+key);
 	}	
 }

@@ -2,6 +2,7 @@ package org.sagebionetworks;
 
 import static org.junit.Assert.assertNotNull;
 
+import org.apache.commons.lang.StringUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,6 +18,7 @@ public class EvaluationStatisticsTest {
 	
 	@Before
 	public void setUp() throws Exception {
+		if (StringUtils.isEmpty(EvaluationStatistics.getProperty("SYNAPSE_USERNAME", true))) return;
 		es = new EvaluationStatistics();
 		synapseClient = es.getSynapseClient();
 		Project project = new Project();
@@ -27,11 +29,13 @@ public class EvaluationStatisticsTest {
 	
 	@After
 	public void tearDown() throws Exception {
+		if (StringUtils.isEmpty(EvaluationStatistics.getProperty("SYNAPSE_USERNAME", true))) return;
 		synapseClient.deleteEntityById(projectId);
 	}
 	
 	@Test
 	public void testWikiRoundTrip() throws Exception {
+		if (StringUtils.isEmpty(EvaluationStatistics.getProperty("SYNAPSE_USERNAME", true))) return;
 		WikiContent wikiContent = new WikiContent();
 		wikiContent.setMarkdown("this is some content");
 		WikiPage wikiPage = es.createWikiPage(projectId, null, "test", wikiContent);
