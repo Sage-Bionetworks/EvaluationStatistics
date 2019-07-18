@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.entity.ContentType;
 import org.joda.time.DateTime;
@@ -643,6 +644,8 @@ public class EvaluationStatistics {
 		String embeddedProperty = properties.getProperty(key);
 		if (embeddedProperty!=null) return embeddedProperty;
 		// (could also check environment variables)
+		String envVar = System.getenv(key);
+		if (!StringUtils.isEmpty(envVar)) return envVar;
 		if (missingOK) return null; else throw new RuntimeException("Cannot find value for "+key);
 	}	
 }
