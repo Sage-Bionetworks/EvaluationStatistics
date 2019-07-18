@@ -32,9 +32,15 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<mainClass>org.sagebionetworks.EvaluationStatistics</mainClass>
 						</manifest>
 					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>org.sagebionetworks.EvaluationStatistics</mainClass>
 				</configuration>
 			</plugin>
 		</plugins>
