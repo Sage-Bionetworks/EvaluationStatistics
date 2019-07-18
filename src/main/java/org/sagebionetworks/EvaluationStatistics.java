@@ -640,9 +640,9 @@ public class EvaluationStatistics {
 	public static String getProperty(String key, boolean missingOK) {
 		initProperties();
 		String commandlineOption = System.getProperty(key);
-		if (commandlineOption!=null) return commandlineOption;
+		if (!StringUtils.isEmpty(commandlineOption)) return commandlineOption;
 		String embeddedProperty = properties.getProperty(key);
-		if (embeddedProperty!=null) return embeddedProperty;
+		if (!StringUtils.isEmpty(embeddedProperty)) return embeddedProperty;
 		// (could also check environment variables)
 		String envVar = System.getenv(key);
 		if (!StringUtils.isEmpty(envVar)) return envVar;
