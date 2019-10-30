@@ -176,15 +176,21 @@ public class EvaluationStatistics {
 							}
 							teamName=team.getName();
 						}
-						if (teamName==null) teamName=sub.getSubmitterAlias();
-						if (teamName!=null) {
-							TeamSubmissionStats tss = teams.get(teamName);
-							if (tss==null) {
-								tss = new TeamSubmissionStats(teamName);
-								teams.put(teamName, tss);
+						if (teamName==null) {
+							// treat the individual as a team of one
+							teamName=sub.getSubmitterAlias();
+							if (teamName==null) {
+								teamName = getUserProfile(sub.getUserId()).getUserName();
 							}
-							updateTSS(tss, sub, status, contributorNames);
 						}
+
+						TeamSubmissionStats tss = teams.get(teamName);
+						if (tss==null) {
+							tss = new TeamSubmissionStats(teamName);
+							teams.put(teamName, tss);
+						}
+						updateTSS(tss, sub, status, contributorNames);
+
 						for (String userName : contributorNames) {
 							UserSubmissionStats uss = users.get(userName);
 							if (uss==null) {
@@ -460,12 +466,12 @@ public class EvaluationStatistics {
 		StringBuilder sb = new StringBuilder();
 		sb.append(markdownRow(new String[]{"statistic", "#"}));
 		sb.append(markdownTableDivider(2));
-		sb.append(markdownRow(new String[]{"#submissions", ""+nSubmissions}));
-		sb.append(markdownRow(new String[]{"#scored", ""+nScored}));
-		sb.append(markdownRow(new String[]{"#invalid", ""+nInvalid}));
-		sb.append(markdownRow(new String[]{"#notScored", ""+nNotScored}));
-		sb.append(markdownRow(new String[]{"#uniqueTeams", ""+nUniqueTeams}));
-		sb.append(markdownRow(new String[]{"#uniqueUsers", ""+nUniqueUsers}));
+		sb.append(markdownRow(new String[]{"# submissions", ""+nSubmissions}));
+		sb.append(markdownRow(new String[]{"# scored", ""+nScored}));
+		sb.append(markdownRow(new String[]{"# invalid", ""+nInvalid}));
+		sb.append(markdownRow(new String[]{"# not scored", ""+nNotScored}));
+		sb.append(markdownRow(new String[]{"# unique teams / non-team participants", ""+nUniqueTeams}));
+		sb.append(markdownRow(new String[]{"# unique participants", ""+nUniqueUsers}));
 		return sb.toString();
 	}
 
@@ -489,9 +495,9 @@ public class EvaluationStatistics {
 		if (isLong) sb.append("{| class=\"short\"\n");
 		sb.append(markdownRow(new String[]{
 				"team", 
-				"#submissions", 
-				"#scored", 
-				"#invalid",
+				"# submissions", 
+				"# scored", 
+				"# invalid",
 				"last submission",
 		"participants"}));
 		sb.append(markdownTableDivider(6));
@@ -517,9 +523,9 @@ public class EvaluationStatistics {
 		if (isLong) sb.append("{| class=\"short\"\n");
 		sb.append(markdownRow(new String[]{
 				"participant", 
-				"#submissions", 
-				"#scored", 
-				"#invalid",
+				"# submissions", 
+				"# scored", 
+				"# invalid",
 				"last submission",
 		"teams"}));
 		sb.append(markdownTableDivider(6));
@@ -546,7 +552,7 @@ public class EvaluationStatistics {
 				if (firstTime) {
 					firstTime=false;
 				} else {
-					sb.append(",");
+					sb.append(", ");
 				}
 				sb.append(s);
 			}
