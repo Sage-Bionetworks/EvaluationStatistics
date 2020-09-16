@@ -1,47 +1,68 @@
 package org.sagebionetworks;
 
+
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
-import org.apache.http.HttpStatus;
+import org.sagebionetworks.client.exceptions.SynapseBadRequestException;
+import org.sagebionetworks.client.exceptions.SynapseConflictingUpdateException;
+import org.sagebionetworks.client.exceptions.SynapseDeprecatedServiceException;
+import org.sagebionetworks.client.exceptions.SynapseException;
+import org.sagebionetworks.client.exceptions.SynapseForbiddenException;
+import org.sagebionetworks.client.exceptions.SynapseNotFoundException;
+import org.sagebionetworks.client.exceptions.SynapseResultNotReadyException;
 import org.sagebionetworks.client.exceptions.SynapseServerException;
-
-import com.amazonaws.services.lambda.model.ServiceException;
+import org.sagebionetworks.client.exceptions.SynapseServiceUnavailable;
+import org.sagebionetworks.client.exceptions.SynapseTermsOfUseException;
+import org.sagebionetworks.client.exceptions.SynapseTooManyRequestsException;
+import org.sagebionetworks.client.exceptions.SynapseUnauthorizedException;
+import org.sagebionetworks.client.exceptions.UnknownSynapseServerException;
 
 public class ExponentialBackoffRunner {
+	public static final List<Class<? extends SynapseServerException>> NO_RETRY_EXCEPTIONS = Arrays.asList(
+			SynapseResultNotReadyException.class,
+			SynapseNotFoundException.class,
+			SynapseBadRequestException.class,
+			SynapseConflictingUpdateException.class,
+			SynapseDeprecatedServiceException.class,
+			SynapseForbiddenException.class, 
+			SynapseTermsOfUseException.class,
+			SynapseUnauthorizedException.class
+			); 
+	
+	public static final Integer[] NO_RETRY_STATUSES = new Integer[] {409};
+	
+	public static int DEFAULT_NUM_RETRY_ATTEMPTS = 8; // 63 sec
 	private static Logger log = Logger.getLogger(ExponentialBackoffRunner.class.getName());
 
-	public static int DEFAULT_NUM_RETRY_ATTEMPTS = 8; // 63 sec
 	private static int NUM_503_RETRY_ATTEMPTS = 16; // 272 min (4h:32m)
 	private static long INITIAL_BACKOFF_MILLIS = 500L;
 	private static long BACKOFF_MULTIPLIER = 2L;
-	
+
 	private int numRetryAttempts;
-	private List<Integer> noRetryStatuses  = null;
-	private List<Class<? extends Exception>> noRetryExceptions = null;
-	
-	public ExponentialBackoffRunner(List<Integer> noRetryStatuses, List<Class<? extends Exception>> noRetryExceptions, int numRetryAttempts) {
-		this.noRetryStatuses=noRetryStatuses;
+	private List<Class<? extends SynapseServerException>> noRetryTypes  = null;
+	private List<Integer> noRetryStatuses;
+
+	public ExponentialBackoffRunner(List<Class<? extends SynapseServerException>> noRetryTypes, Integer[] noRetryStatuses, int numRetryAttempts) {
+		this.noRetryTypes=noRetryTypes;
+		this.noRetryStatuses=Arrays.asList(noRetryStatuses);
 		this.numRetryAttempts=numRetryAttempts;
-		this.noRetryExceptions=noRetryExceptions;
 	}
-	
+
 	public ExponentialBackoffRunner() {
-		this.noRetryStatuses=Collections.EMPTY_LIST;
+		this.noRetryTypes=Collections.EMPTY_LIST;
+		this.noRetryStatuses = Collections.EMPTY_LIST;
 		this.numRetryAttempts=DEFAULT_NUM_RETRY_ATTEMPTS;
-		this.noRetryExceptions=Collections.EMPTY_LIST;
 	}
-	
+
 	private static String exceptionMessage(Throwable e) {
 		if (e==null) return null;
-		if (e instanceof SynapseServerException) {
-			return ""+((SynapseServerException)e).getStatusCode()+" "+e.getMessage();
-		}
 		return e.getMessage();
 	}
-	
+
 	/**
 	 * 
 	 * Note, the total sleep time before giving up is:
@@ -53,33 +74,34 @@ public class ExponentialBackoffRunner {
 	 * @throws IOException
 	 * @throws ServiceException
 	 */
-	public <T> T execute(Executable<T> executable) throws Throwable {
+	public <T,V> T execute(Executable<T,V> executable, V args) throws Throwable {
 		long backoff = INITIAL_BACKOFF_MILLIS;
 		Throwable lastException=null;
 		int i = 0;
 		while (true) {
-			Integer statusCode = null;
 			try {
-				return executable.execute();
-			} catch (SynapseServerException e) {
-				statusCode=e.getStatusCode();
+				return executable.execute(args);
+			} catch (UnknownSynapseServerException e) {
+				Integer statusCode = e.getStatusCode();
 				if (noRetryStatuses.contains(statusCode)) {
-					log.severe("Will not retry: "+exceptionMessage(e)); 
-					throw e;					
+						log.severe("Found status code "+statusCode+". Will not retry: "+exceptionMessage(e)); 
+						throw e;	
 				}
 				lastException=e;
-			} catch (Exception e) {
-				for (Class<? extends Exception> exceptionClass : noRetryExceptions) {
-					if (e.getClass().equals(exceptionClass)) {
+			} catch (SynapseException e) {
+				if (noRetryTypes.contains(e.getClass())) {
 						log.severe("Will not retry: "+exceptionMessage(e)); 
-						throw e;
-					}
+						throw e;	
 				}
 				lastException=e;
 			}
 			log.warning("Encountered exception on attempt "+i+": "+exceptionMessage(lastException));
+			if (i==0 && lastException!=null && (lastException instanceof SynapseTooManyRequestsException)) {
+				// we're getting a 429 so start with a greater backoff
+				backoff *= (BACKOFF_MULTIPLIER*BACKOFF_MULTIPLIER);	
+			}
 			i++;
-			if (statusCode!=null && HttpStatus.SC_SERVICE_UNAVAILABLE==statusCode) {
+			if (lastException!=null && (lastException instanceof SynapseServiceUnavailable)) {
 				if (i>=NUM_503_RETRY_ATTEMPTS) break;				
 			} else {
 				if (i>=numRetryAttempts) break;
@@ -90,6 +112,7 @@ public class ExponentialBackoffRunner {
 				throw lastException;
 			}
 			backoff *= BACKOFF_MULTIPLIER;
+			args = executable.refreshArgs(args); // implementation could be a no-op, simply returning the passed in value
 		}
 		log.severe("Exhausted retries. Throwing exception: "+exceptionMessage(lastException));
 		throw lastException;

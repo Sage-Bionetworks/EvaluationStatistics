@@ -8,8 +8,11 @@ before_install:
 
 script: 
 - >
-  docker run --rm -it 
+  travis_wait 60 docker run --rm -it 
   -e SYNAPSE_USERNAME=${SYNAPSE_USERNAME}
   -e SYNAPSE_PASSWORD=${SYNAPSE_PASSWORD}
   -e PROJECT_ID=${PROJECT_ID}
   sagebionetworks/evaluationstatistics
+
+
+  

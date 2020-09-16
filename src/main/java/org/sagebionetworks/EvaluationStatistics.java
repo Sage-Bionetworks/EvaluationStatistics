@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.entity.ContentType;
 import org.joda.time.DateTime;
