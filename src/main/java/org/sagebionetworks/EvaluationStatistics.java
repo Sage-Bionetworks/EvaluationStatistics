@@ -354,7 +354,7 @@ public class EvaluationStatistics {
 
 	private static void updateTSS(TeamSubmissionStats tss, Submission sub, SubmissionStatus status, Set<String> userNames) {
 		tss.setSubmissionCount(tss.getSubmissionCount()+1);
-		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
+		if (status.getStatus()==SubmissionStatusEnum.SCORED || status.getStatus()==SubmissionStatusEnum.ACCEPTED) {
 			tss.setScoredCount(tss.getScoredCount()+1);
 		}
 		if (status.getStatus()==SubmissionStatusEnum.INVALID) {
@@ -368,7 +368,7 @@ public class EvaluationStatistics {
 
 	private static void updateUSS(UserSubmissionStats uss, Submission sub, SubmissionStatus status, String teamName) {
 		uss.setSubmissionCount(uss.getSubmissionCount()+1);
-		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
+		if (status.getStatus()==SubmissionStatusEnum.SCORED || status.getStatus()==SubmissionStatusEnum.ACCEPTED) {
 			uss.setScoredCount(uss.getScoredCount()+1);
 		}
 		if (status.getStatus()==SubmissionStatusEnum.INVALID) {
