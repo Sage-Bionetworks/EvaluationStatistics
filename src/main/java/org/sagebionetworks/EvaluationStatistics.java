@@ -218,7 +218,10 @@ public class EvaluationStatistics {
 				if (totalNumberOfSubmissions==0) continue; // if there are no entries, don't build a wiki
 				WikiContent wikiContent = new WikiContent();
 				int nSubmissions = (int)totalNumberOfSubmissions;
-				Integer nScored = statusToCountMap.get(SubmissionStatusEnum.SCORED); if (nScored==null) nScored=0;
+				Integer nScored = statusToCountMap.get(SubmissionStatusEnum.SCORED); 
+				if (nScored==null) {
+					nScored = statusToCountMap.get(SubmissionStatusEnum.ACCEPTED); if (nScored==null) nScored=0;
+				}
 				Integer nInvalid = statusToCountMap.get(SubmissionStatusEnum.INVALID); if (nInvalid==null) nInvalid=0;
 				int nNotScored = nSubmissions - nScored - nInvalid;
 				if (nNotScored<0) throw new IllegalStateException();
@@ -351,7 +354,7 @@ public class EvaluationStatistics {
 
 	private static void updateTSS(TeamSubmissionStats tss, Submission sub, SubmissionStatus status, Set<String> userNames) {
 		tss.setSubmissionCount(tss.getSubmissionCount()+1);
-		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
+		if (status.getStatus()==SubmissionStatusEnum.SCORED || status.getStatus()==SubmissionStatusEnum.ACCEPTED) {
 			tss.setScoredCount(tss.getScoredCount()+1);
 		}
 		if (status.getStatus()==SubmissionStatusEnum.INVALID) {
@@ -365,7 +368,7 @@ public class EvaluationStatistics {
 
 	private static void updateUSS(UserSubmissionStats uss, Submission sub, SubmissionStatus status, String teamName) {
 		uss.setSubmissionCount(uss.getSubmissionCount()+1);
-		if (status.getStatus()==SubmissionStatusEnum.SCORED) {
+		if (status.getStatus()==SubmissionStatusEnum.SCORED || status.getStatus()==SubmissionStatusEnum.ACCEPTED) {
 			uss.setScoredCount(uss.getScoredCount()+1);
 		}
 		if (status.getStatus()==SubmissionStatusEnum.INVALID) {
