@@ -218,7 +218,10 @@ public class EvaluationStatistics {
 				if (totalNumberOfSubmissions==0) continue; // if there are no entries, don't build a wiki
 				WikiContent wikiContent = new WikiContent();
 				int nSubmissions = (int)totalNumberOfSubmissions;
-				Integer nScored = statusToCountMap.get(SubmissionStatusEnum.SCORED); if (nScored==null) nScored=0;
+				Integer nScored = statusToCountMap.get(SubmissionStatusEnum.SCORED); 
+				if (nScored==null) {
+					nScored = statusToCountMap.get(SubmissionStatusEnum.ACCEPTED); if (nScored==null) nScored=0;
+				}
 				Integer nInvalid = statusToCountMap.get(SubmissionStatusEnum.INVALID); if (nInvalid==null) nInvalid=0;
 				int nNotScored = nSubmissions - nScored - nInvalid;
 				if (nNotScored<0) throw new IllegalStateException();
